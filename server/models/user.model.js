@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true,
+
     trim: true,
   },
   password: {
@@ -29,8 +29,12 @@ const userSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["active", "inactive", "banned"],
+    enum: ["active", "inactive", "banned", "pending"],
     default: "active",
+  },
+  verified: {
+    type: Boolean,
+    default: false,
   },
 });
 

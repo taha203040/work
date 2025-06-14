@@ -3,6 +3,9 @@ import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET, JWT_EXPIRES_IN, NODE_ENV } from "../config/env.js";
 import { comparePass, hashPassword } from "../utils/hashing.js";
+import transporter from "../config/nodemailer.js";
+import { sendEmailOtp } from "../utils/emailSend.js";
+import bcrypt from "bcrypt"
 // Register a new user
 
 export const signUp = async (req, res, next) => {
@@ -25,7 +28,7 @@ export const signUp = async (req, res, next) => {
     const token = jwt.sign({ id: newUser[0]._id }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     });
-
+    await sendEmailOtp({ email });
     await session.commitTransaction();
     session.endSession();
     res.status(201).json({
@@ -107,4 +110,14 @@ export const checkCookie = (req, res) => {
     console.error("JWT verification error:", error.message);
     return res.status(403).json({ authenticated: false, msg: "Invalid token" });
   }
+};
+
+const checkOtp = async () => {
+  try {
+    const { otp } = req.body;
+  // compare the otp with storedotp 
+  const compare = await bcrypt.compare(otp , otpHashed)
+  if(!compare) throw new Error("the OTP INVALID")
+    
+  } catch (error) {}
 };
