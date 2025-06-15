@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import dayjs from "dayjs";
 const noteSchema = new mongoose.Schema(
+  
   {
     content: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now },

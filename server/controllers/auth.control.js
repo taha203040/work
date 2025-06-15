@@ -5,7 +5,9 @@ import { JWT_SECRET, JWT_EXPIRES_IN, NODE_ENV } from "../config/env.js";
 import { comparePass, hashPassword } from "../utils/hashing.js";
 import transporter from "../config/nodemailer.js";
 import { sendEmailOtp } from "../utils/emailSend.js";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
+import UsrOTPVer from "../models/otp.module.js";
+import dayjs from "dayjs";
 // Register a new user
 
 export const signUp = async (req, res, next) => {
@@ -28,9 +30,10 @@ export const signUp = async (req, res, next) => {
     const token = jwt.sign({ id: newUser[0]._id }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     });
-    await sendEmailOtp({ email });
     await session.commitTransaction();
     session.endSession();
+    await sendEmailOtp({ email }, User);
+
     res.status(201).json({
       msj: "USER Created successfuly",
       User: newUser[0],
@@ -112,12 +115,58 @@ export const checkCookie = (req, res) => {
   }
 };
 
-const checkOtp = async () => {
+export const checkOtp = async (req, res) => {
   try {
-    const { otp } = req.body;
-  // compare the otp with storedotp 
-  const compare = await bcrypt.compare(otp , otpHashed)
-  if(!compare) throw new Error("the OTP INVALID")
-    
-  } catch (error) {}
+    const { email, otpCode } = req.body;
+    if (!email || !otpCode) {
+      res.status(404).json({
+        msg: "All filds are required",
+      });
+      return;
+      // check if otp stored in db
+    }
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // check the otp code or record
+    const recordOtpVerCd = await UsrOTPVer.findOne({ user: user._id }).populate(
+      "user"
+    );
+
+    if (!recordOtpVerCd || !recordOtpVerCd.otpCode) {
+      return res.status(401).json({
+        msg: "OTP expired or not found. Please request a new code.",
+      });
+    }
+    if (dayjs().isAfter(recordOtpVerCd.expiredAt)) {
+      console.log("the otp is expired  resend the code to check again");
+      newOtp.otpCode = "";
+      await newOtp.save();
+    }
+    const isMatch = await bcrypt.compare(
+      req.body.otpCode,
+      recordOtpVerCd.otpCode
+    );
+    if (!isMatch)
+      res.status(401).json({ msg: "the otp is wrong check your inbox email" });
+
+    await User.updateOne({ email }, { verified: true, status: "active" });
+    res.status(200).json({ msg: "your account has verified" });
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+export const resendEmail = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ msg: "email reaquired" });
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ msg: "user not found" });
+  await sendEmailOtp({ email }, user);
+  sendEmailOtp({ email }, User);
+  res.status(200).json({
+    msg:"the otp is resended"
+  })
 };

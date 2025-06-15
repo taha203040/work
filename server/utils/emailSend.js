@@ -1,21 +1,29 @@
 import transporter from "../config/nodemailer.js";
 import usrOTPVer from "../models/otp.module.js";
-import mongoose from "mongoose";
 import { EMAIL_SENDER } from "../config/env.js";
-export const sendEmailOtp = async ({ email }) => {
+import dayjs from "dayjs";
+import User from "../models/user.model.js";
+import { generateOtpEmailTemplate } from "../utils/template.js";
+export const sendEmailOtp = async ({ email }, user) => {
   try {
-    const OTP = `${Math.floor(Math.random() + 9000)}`;
+    const OTP = `${Math.floor(Math.random() * 9999)}`;
+    const user = await User.findOne({ email });
 
+    // Store the otp in the db
+    const newOtp = await usrOTPVer.create({
+      otpCode: OTP,
+      user: user._id,
+      expiredAt: dayjs().add(15, "minute").toDate(),
+    });
+
+    // Config the Emai before send it
     const mailOption = {
       from: EMAIL_SENDER,
       to: email,
       subject: "hi",
-      html: `<p>Enter ${OTP} in the app to verify your email address</p>`,
+      html: generateOtpEmailTemplate(OTP, "Taha"),
     };
 
-    const newOtp = usrOTPVer.create({
-      otpCode: OTP,
-    });
     transporter.sendMail(mailOption, (err, info) => {
       if (err) return console.log(err, "Error sending email");
       console.log(info);
